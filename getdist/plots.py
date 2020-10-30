@@ -1640,7 +1640,16 @@ class GetDistPlotter(_BaseObject):
             param_pair = param1
             param1 = None
         _no_finish = kwargs.pop('_no_finish', False)
-        param_pair = self.get_param_array(roots[0], param_pair or [param1, param2])
+        param_pair = param_pair or [param1, param2]
+        for i, root in enumerate(roots):
+            root_param1 = self._check_param(root, param_pair[0])
+            root_param2 = self._check_param(root, param_pair[1])
+            if root_param1 and root_param2:
+                param_pair = root_param1, root_param2
+                break
+        else:
+            raise GetDistPlotError('No roots have all parameters')
+        
         ax = self.get_axes(ax, pars=param_pair)
         if self.settings.progress:
             print('plotting: ', [param.name for param in param_pair])
@@ -2250,7 +2259,7 @@ class GetDistPlotter(_BaseObject):
                       contour_args=None, contour_colors=None, contour_ls=None, contour_lws=None, line_args=None,
                       label_order=None, legend_ncol=None, legend_loc=None, title_limit=None, upper_roots=None,
                       upper_kwargs=empty_dict, upper_label_right=False, diag1d_kwargs=empty_dict, markers=None,
-                      marker_args=empty_dict, param_limits=empty_dict, **kwargs):
+                      marker_args=empty_dict, param_limits=empty_dict, no_extra_legend_space=True, **kwargs):
         """
         Make a trianglular array of 1D and 2D plots.
 
@@ -2309,7 +2318,18 @@ class GetDistPlotter(_BaseObject):
 
         """
         roots = makeList(roots)
-        params = self.get_param_array(roots[0], params)
+        for r in roots:
+            try:
+                params = self.get_param_array(r, params)
+            except Exception as e:
+                if "parameter name not found" in str(e):
+                    continue
+                else:
+                    raise e
+            break
+        else:
+            raise ValueError("No root with all params found.")
+
         plot_col = len(params)
         if plot_3d_with_param is not None:
             col_param = self._check_param(roots[0], plot_3d_with_param)
@@ -2512,15 +2532,16 @@ class GetDistPlotter(_BaseObject):
         else:
             legend_loc = legend_loc or self.settings.figure_legend_loc
         args = {}
-        if 'upper' in legend_loc and upper_roots is None:
+        if 'upper' in legend_loc and upper_roots is None and no_extra_legend_space:
             args['bbox_to_anchor'] = (self.plot_col / (2 if 'center' in legend_loc else 1), 1)
             args['bbox_transform'] = self.subplots[0, 0].transAxes
             args['borderaxespad'] = 0
 
+        print(no_extra_legend_space)
         self.finish_plot(labels, label_order=label_order,
                          legend_ncol=legend_ncol or self.settings.figure_legend_ncol or (
                              None if upper_roots is None else len(labels)), legend_loc=legend_loc,
-                         no_extra_legend_space=upper_roots is None, no_tight=title_limit or self.settings.title_limit,
+                         no_extra_legend_space=(upper_roots is None) and no_extra_legend_space, no_tight=title_limit or self.settings.title_limit,
                          **args)
 
     def rectangle_plot(self, xparams, yparams, yroots=None, roots=None, plot_roots=None, plot_texts=None,
