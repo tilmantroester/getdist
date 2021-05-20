@@ -1533,8 +1533,9 @@ class MainWindow(QMainWindow):
             logging.debug("Plotting with roots = %s" % str(roots))
 
             # fudge factor of 0.8 seems to help with overlapping labels on retina Mac.
-            height = self.plotWidget.height() / self.logicalDpiX() * 0.8 / self.devicePixelRatio()
-            width = self.plotWidget.width() / self.logicalDpiX() * 0.8 / self.devicePixelRatio()
+            # seem to have to render at the dpi-scaled small size, as then scaled up
+            height = self.plotWidget.height() / self.logicalDpiX() / self.devicePixelRatio()
+            width = self.plotWidget.width() / self.logicalDpiX() / self.devicePixelRatio()
 
             def setSizeForN(cols, rows):
                 if self.plotter.settings.fig_width_inch is not None:
