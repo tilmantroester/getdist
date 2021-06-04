@@ -3034,7 +3034,7 @@ class GetDistPlotter(_BaseObject):
         return x, y, z
 
     def plot_4d(self, roots, params, color_bar=True, colorbar_args: Mapping = empty_dict,
-                ax=None, lims=empty_dict, azim: Optional[float] = 77, elev: Optional[float] = None,
+                ax=None, lims=empty_dict, azim: Optional[float] = 15, elev: Optional[float] = None,
                 alpha: Union[float, Sequence[float]] = 0.1, marker='o',
                 max_scatter_points: Optional[int] = None,
                 shadow_color=None, shadow_alpha=None, fixed_color=None, compare_colors=None,
@@ -3083,7 +3083,7 @@ class GetDistPlotter(_BaseObject):
 
             samples1, samples2 = gaussian_mixtures.randomTestMCSamples(ndim=4, nMCSamples=2)
             samples1.samples[:, 0] *= 5  # stretch out in one direction
-            g = plots.get_single_plotter(width_inch=8)
+            g = plots.get_single_plotter()
             g.plot_4d([samples1, samples2], ['x0', 'x1', 'x2', 'x3'],
                       cmap='viridis', color_bar=False,
                       alpha=[0.3, 0.1],  shadow_color=False, compare_colors=['k'])
@@ -3109,11 +3109,7 @@ class GetDistPlotter(_BaseObject):
               compare_colors=['k'],
               animate=True, mp4_filename='sample_rotation.mp4', mp4_bitrate=1024, anim_fps=20)
 
-        .. raw:: html
-            <video controls loop>
-              <source src="https://cdn.cosmologist.info/antony/sample_rotation.mp4" type="video/mp4">
-            Your browser does not support the video tag.
-            </video>
+        See `sample output video <hhttps://cdn.cosmologist.info/antony/sample_rotation.mp4>`_.
         """
         roots = makeList(roots)
         if not params:
