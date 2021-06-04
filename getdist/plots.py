@@ -3034,7 +3034,7 @@ class GetDistPlotter(_BaseObject):
         return x, y, z
 
     def plot_4d(self, roots, params, color_bar=True, colorbar_args: Mapping = empty_dict,
-                ax=None, lims=empty_dict, azim: Optional[float] = 15, elev: Optional[float] = None, dist: float = 11,
+                ax=None, lims=empty_dict, azim: Optional[float] = 15, elev: Optional[float] = None, dist: float = 12,
                 alpha: Union[float, Sequence[float]] = 0.1, marker='o', max_scatter_points: Optional[int] = None,
                 shadow_color=None, shadow_alpha=None, fixed_color=None, compare_colors=None,
                 animate=False, anim_angle_degrees=360, anim_step_degrees=0.6, anim_fps=15,
@@ -3074,7 +3074,7 @@ class GetDistPlotter(_BaseObject):
         :param anim_fps: animation frames per second
         :param mp4_filename: if animating, optional filename to produce mp4 video
         :param mp4_bitrate: bitrate
-        :param kwargs: additional optional arguments for :func:`~matplotlib:mpl_toolkits.mplot3d.axes3d.Axes3D.scatter`
+        :param kwargs: additional optional arguments for :meth:`~matplotlib:mpl_toolkits.mplot3d.axes3d.Axes3D.scatter`
 
         .. plot::
            :include-source:
