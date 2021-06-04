@@ -3034,9 +3034,8 @@ class GetDistPlotter(_BaseObject):
         return x, y, z
 
     def plot_4d(self, roots, params, color_bar=True, colorbar_args: Mapping = empty_dict,
-                ax=None, lims=empty_dict, azim: Optional[float] = 15, elev: Optional[float] = None,
-                alpha: Union[float, Sequence[float]] = 0.1, marker='o',
-                max_scatter_points: Optional[int] = None,
+                ax=None, lims=empty_dict, azim: Optional[float] = 15, elev: Optional[float] = None, dist: float = 11,
+                alpha: Union[float, Sequence[float]] = 0.1, marker='o', max_scatter_points: Optional[int] = None,
                 shadow_color=None, shadow_alpha=None, fixed_color=None, compare_colors=None,
                 animate=False, anim_angle_degrees=360, anim_step_degrees=0.6, anim_fps=15,
                 mp4_filename: Optional[str] = None, mp4_bitrate=-1, **kwargs):
@@ -3051,13 +3050,14 @@ class GetDistPlotter(_BaseObject):
                     fixed_color and specify just three parameters
         :param color_bar: True if should include a color bar
         :param colorbar_args: extra arguments for colorbar
-        :param ax: optional :class:`~matplotlib:matplotlib.axes3d.Axes3D` instance
+        :param ax: optional :class:`~matplotlib:mpl_toolkits.mplot3d.axes3d.Axes3D` instance
                    to add to (defaults to current plot or the first/main plot if none)
         :param lims: dictionary of optional limits, e.g. {'param1':(min1, max1),'param2':(min2,max2)}.
                       If this include parameters that are not plotted, the samples outside the limits will still be
                       removed
         :param azim: azimuth for initial view
         :param elev: elevation for initial view
+        :param dist: distance for view (make larger if labels out of area)
         :param alpha: alpha, or list of alphas for each root, to use for scatter samples
         :param marker:  marker, or list of markers for each root
         :param max_scatter_points: if set, maximum number of points to plots from each root
@@ -3074,7 +3074,7 @@ class GetDistPlotter(_BaseObject):
         :param anim_fps: animation frames per second
         :param mp4_filename: if animating, optional filename to produce mp4 video
         :param mp4_bitrate: bitrate
-        :param kwargs: additional optional arguments for :func:`~matplotlib:matplotlib.axes3d.Axes3D.scatter`
+        :param kwargs: additional optional arguments for :func:`~matplotlib:mpl_toolkits.mplot3d.axes3d.Axes3D.scatter`
 
         .. plot::
            :include-source:
@@ -3109,7 +3109,7 @@ class GetDistPlotter(_BaseObject):
               compare_colors=['k'],
               animate=True, mp4_filename='sample_rotation.mp4', mp4_bitrate=1024, anim_fps=20)
 
-        See `sample output video <hhttps://cdn.cosmologist.info/antony/sample_rotation.mp4>`_.
+        See `sample output video <https://cdn.cosmologist.info/antony/sample_rotation.mp4>`_.
         """
         roots = makeList(roots)
         if not params:
@@ -3120,6 +3120,7 @@ class GetDistPlotter(_BaseObject):
             if not self.fig:
                 self.make_figure()
             ax = self.subplots[0, 0] = Axes3D(self.fig)
+            ax.dist = dist
         pts = []
         for i, (root, alph, mark) in enumerate(extend_list_zip(roots, alpha, marker)):
             pts.append(self.add_4d_scatter(root, params, ax, color_bar=not i and color_bar,
