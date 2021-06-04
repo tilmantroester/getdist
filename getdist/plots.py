@@ -3095,7 +3095,7 @@ class GetDistPlotter(_BaseObject):
 
             samples1 = gaussian_mixtures.randomTestMCSamples(ndim=4)
             samples1.samples[:, 0] *= 5  # stretch out in one direction
-
+            g = plots.get_single_plotter()
             g.plot_4d(samples1, ['x0', 'x1', 'x2', 'x3'], cmap='jet',
                       alpha=0.4, shadow_alpha=0.05, shadow_color=True,
                       max_scatter_points=6000,
