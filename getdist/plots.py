@@ -1134,7 +1134,7 @@ class GetDistPlotter(_BaseObject):
         :param colormap: color map, default to settings.colormap (see :class:`GetDistPlotSettings`)
         :param density: optional user-provided :class:`~.densities.Density2D` to plot rather than
                         the auto-generated density from the samples
-         :param ax: optional :class:`~matplotlib:matplotlib.axes.Axes` instance (or y,x subplot coordinate)
+        :param ax: optional :class:`~matplotlib:matplotlib.axes.Axes` instance (or y,x subplot coordinate)
                    to add to (defaults to current plot or the first/main plot if none)
         :param kwargs: keyword arguments for :func:`~matplotlib:matplotlib.pyplot.contourf`
         """
@@ -1287,7 +1287,7 @@ class GetDistPlotter(_BaseObject):
            :include-source:
 
             from getdist import plots, gaussian_mixtures
-            samples= gaussian_mixtures.randomTestMCSamples(ndim=2, nMCSamples=1)
+            samples = gaussian_mixtures.randomTestMCSamples(ndim=2, nMCSamples=1)
             g = plots.get_single_plotter(width_inch=4)
             g.plot_2d(samples, ['x0','x1'], filled=True);
             g.add_y_bands(0, 1)
@@ -3110,7 +3110,7 @@ class GetDistPlotter(_BaseObject):
               animate=True, mp4_filename='sample_rotation.mp4', mp4_bitrate=1024, anim_fps=20)
 
         .. raw:: html
-            <video>
+            <video controls loop>
               <source src="https://cdn.cosmologist.info/antony/sample_rotation.mp4" type="video/mp4">
             Your browser does not support the video tag.
             </video>
