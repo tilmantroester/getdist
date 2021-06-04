@@ -3038,10 +3038,12 @@ class GetDistPlotter(_BaseObject):
                 alpha: Union[float, Sequence[float]] = 0.1, marker='o',
                 max_scatter_points: Optional[int] = None,
                 shadow_color=None, shadow_alpha=None, fixed_color=None, compare_colors=None,
-                animate=False, anim_angle_degrees=0.6, anim_fps=15,
+                animate=False, anim_angle_degrees=360, anim_step_degrees=0.6, anim_fps=15,
                 mp4_filename: Optional[str] = None, mp4_bitrate=-1, **kwargs):
         """
-        Make a 3d x-y-z scatter plot colored by the value of a fourth parameter
+        Make a 3d x-y-z scatter plot colored by the value of a fourth parameter.
+        If animate is True, it will rotate, and can be saved to an mp4 video file by setting
+        mp4_filename (you must have ffmpeg installed). Note animations can be quite slow to render.
 
         :param roots: root name or :class:`~.mcsamples.MCSamples` instance (or list of any of either of these) for
                       the samples to plot
@@ -3067,7 +3069,8 @@ class GetDistPlotter(_BaseObject):
         :param compare_colors: if not None, fixed scatter color for second-and-higher roots rather than using 4th
                             parameter value
         :param animate: if True, rotate the plot
-        :param anim_angle_degrees: angle per frame
+        :param anim_angle_degrees: total angle for animation rotation
+        :param anim_step_degrees: angle per frame
         :param anim_fps: animation frames per second
         :param mp4_filename: if animating, optional filename to produce mp4 video
         :param mp4_bitrate: bitrate
@@ -3081,7 +3084,8 @@ class GetDistPlotter(_BaseObject):
             samples1, samples2 = gaussian_mixtures.randomTestMCSamples(ndim=4, nMCSamples=2)
             samples1.samples[:, 0] *= 5  # stretch out in one direction
             g = plots.get_single_plotter(width_inch=8)
-            g.plot_4d([samples1, samples2], ['x0', 'x1', 'x2', 'x3'], cmap='viridis',
+            g.plot_4d([samples1, samples2], ['x0', 'x1', 'x2', 'x3'],
+                      cmap='viridis', color_bar=False,
                       alpha=[0.3, 0.1],  shadow_color=False, compare_colors=['k'])
 
         .. plot::
@@ -3096,7 +3100,17 @@ class GetDistPlotter(_BaseObject):
                       alpha=0.4, shadow_alpha=0.05, shadow_color=True,
                       max_scatter_points=6000,
                       lims={'x2': (-3, 3), 'x3': (-3, 3)},
-                      colorbar_args={'shrink': 0.6});
+                      colorbar_args={'shrink': 0.6})
+
+        Generate an mp4 video (in jupyer, using a notebook rather than inline matplotlib)::
+
+            g.plot_4d([samples1, samples2], ['x0', 'x1', 'x2', 'x3'], cmap='viridis',
+              alpha = [0.3,0.1], shadow_alpha=[0.1,0.005], shadow_color=False,
+              compare_colors=['k'],
+              animate=True, mp4_filename='sample_rotation.mp4', mp4_bitrate=1024, anim_fps=20)
+
+        .. video:: https://cdn.cosmologist.info/antony/sample_rotation.mp4
+
 
         """
         roots = makeList(roots)
@@ -3155,9 +3169,9 @@ class GetDistPlotter(_BaseObject):
                 ax.view_init(azim=azim + angle)
 
             # note this is slow in notebook when using low thin factors
-            self.fig.rot_animation = animation.FuncAnimation(self.fig, rotate,
-                                                             frames=np.arange(0, 360, anim_angle_degrees),  # noqa
-                                                             interval=1000 / anim_fps)
+            self.fig.rot_animation = animation.FuncAnimation(
+                self.fig, rotate, frames=np.arange(0, anim_angle_degrees, anim_step_degrees),  # noqa
+                interval=1000 / anim_fps)
             if mp4_filename:
                 # need ffmpeg installed
                 writer = animation.writers['ffmpeg'](fps=anim_fps, bitrate=mp4_bitrate)
