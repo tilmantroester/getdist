@@ -3102,16 +3102,18 @@ class GetDistPlotter(_BaseObject):
                       lims={'x2': (-3, 3), 'x3': (-3, 3)},
                       colorbar_args={'shrink': 0.6})
 
-        Generate an mp4 video (in jupyer, using a notebook rather than inline matplotlib)::
+        Generate an mp4 video (in jupyter, using a notebook rather than inline matplotlib)::
 
             g.plot_4d([samples1, samples2], ['x0', 'x1', 'x2', 'x3'], cmap='viridis',
               alpha = [0.3,0.1], shadow_alpha=[0.1,0.005], shadow_color=False,
               compare_colors=['k'],
               animate=True, mp4_filename='sample_rotation.mp4', mp4_bitrate=1024, anim_fps=20)
 
-        .. video:: https://cdn.cosmologist.info/antony/sample_rotation.mp4
-
-
+        .. raw:: html
+            <video>
+              <source src="https://cdn.cosmologist.info/antony/sample_rotation.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+            </video>
         """
         roots = makeList(roots)
         if not params:

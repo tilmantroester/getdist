@@ -49,8 +49,7 @@ needs_sphinx = '1.3'
 # ones.
 extensions = [
     'sphinx.ext.autodoc', 'sphinx.ext.intersphinx', 'sphinx.ext.viewcode', 'sphinx.ext.autosummary',
-    'matplotlib.sphinxext.plot_directive',
-    'sphinxcontrib.video'
+    'matplotlib.sphinxext.plot_directive'
 ]
 
 intersphinx_mapping = {'python': ('https://docs.python.org/3', None),
