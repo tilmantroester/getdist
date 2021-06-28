@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from __future__ import print_function
 import re
 import os
 import sys
@@ -8,10 +7,6 @@ try:
     from setuptools import setup
 except ImportError:
     from distutils.core import setup
-
-if sys.version_info[0] == 2:
-    print('getdist no longer support Python 2, please upgrade to Python 3')
-    sys.exit(1)
 
 
 def find_version():
@@ -137,12 +132,13 @@ setup(name='GetDist',
       test_suite='getdist.tests',
       package_data=package_data,
       install_requires=[
-          'numpy',
+          'numpy (>=1.17.0)',
           'matplotlib (>=2.2.0)',
-          "scipy (>=1.0.0)"],
+          'scipy (>=1.5.0)',
+          'PyYAML (>=5.1)'],
       # PySide2 is needed for the GUI
       # pandas optional (for faster txt chain file read)
-      extras_require={'GUI': ["PySide2>=5.2"], 'txt': ["pandas>=0.14.0"]},
+      extras_require={'GUI': ["PySide2>=5.13"], 'txt': ["pandas>=0.14.0"]},
       cmdclass=cmd_class,
       classifiers=[
           'Development Status :: 5 - Production/Stable',
@@ -152,6 +148,7 @@ setup(name='GetDist',
           'Programming Language :: Python :: 3.6',
           'Programming Language :: Python :: 3.7',
           'Programming Language :: Python :: 3.8',
+          'Programming Language :: Python :: 3.9'
       ],
       python_requires='>=3.6',
       keywords=['MCMC', 'KDE', 'sample', 'density estimation', 'plot', 'figure']

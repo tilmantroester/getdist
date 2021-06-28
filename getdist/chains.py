@@ -1,6 +1,6 @@
 import os
-import random
 import numpy as np
+import re
 from getdist.paramnames import ParamNames, ParamInfo, escapeLatex
 from getdist.convolve import autoConvolve
 from getdist import cobaya_interface
@@ -8,7 +8,7 @@ import pickle
 import logging
 from copy import deepcopy
 from collections import namedtuple
-from typing import Sequence, Any, Optional, Union
+from typing import Sequence, Any, Optional, Union, List
 
 # whether to write to terminal chain names and burn in details when loaded from file
 print_load_details = True
@@ -26,14 +26,17 @@ class WeightedSampleError(Exception):
     """
     An exception that is raised when a WeightedSamples error occurs
     """
-    pass
 
 
 class ParamError(WeightedSampleError):
     """
     An Exception that indicates a bad parameter.
     """
-    pass
+
+
+def print_load_line(message):
+    if print_load_details:
+        print(message)
 
 
 def last_modified(files):
@@ -43,7 +46,7 @@ def last_modified(files):
     :param files: An iterable of file names.
     :return: The latest "last modified" time
     """
-    return max([os.path.getmtime(fname) for fname in files if os.path.exists(fname)])
+    return max(os.path.getmtime(fname) for fname in files if os.path.exists(fname))
 
 
 def slice_or_none(x, start=None, end=None):
@@ -87,24 +90,22 @@ def chainFiles(root, chain_indices=None, ext='.txt', separator="_",
     :param chain_exclude: A list of indexes to exclude, None to include all
     :return: The list of file names
     """
-    index = -1
+
+    folder = os.path.dirname(root)
+    if root.endswith((os.sep, "/")):
+        reg_exp = re.compile('(?P<num>[0-9]+)?' + re.escape(ext))
+    else:
+        basename = os.path.basename(root)
+        reg_exp = re.compile(re.escape(basename) + '(' + re.escape(separator) + '(?P<num>[0-9]+))?' + re.escape(ext))
     files = []
-    while True:
-        index += 1
-        fname = root
-        if index > 0:
-            # deal with just-folder prefix
-            if not root.endswith((os.sep, "/")):
-                fname += separator
-            fname += str(index)
-        if not fname.endswith(ext):
-            fname += ext
-        if index > first_chain and not os.path.exists(fname) or 0 < last_chain < index:
-            break
-        if (chain_indices is None or index in chain_indices) \
-                and (chain_exclude is None or index not in chain_exclude) \
-                and index >= first_chain and os.path.exists(fname):
-            files.append(fname)
+    for f in os.listdir(folder):
+        match = reg_exp.fullmatch(f)
+        if match:
+            index = int(match.group("num") or 0)
+            if (chain_indices is None or index in chain_indices) \
+                    and (chain_exclude is None or index not in chain_exclude) \
+                    and index >= first_chain and (last_chain < 0 or index <= last_chain):
+                files.append(os.path.join(folder, f))
     return files
 
 
@@ -844,9 +845,25 @@ class WeightedSamples:
         """
         if weights is None:
             weights = self.weights
+        return WeightedSamples.thin_indices_single_samples(factor, weights)
+
+    @staticmethod
+    def thin_indices_and_weights(factor, weights):
+        """
+        Returns indices and new weights for use when thinning samples.
+
+        :param factor: thin factor
+        :param weights: initial weight (counts) per sample point
+        :return: (unique index, counts) tuple of sample index values to keep and new weights
+        """
+        thin_ix = WeightedSamples.thin_indices_single_samples(factor, weights)
+        return np.unique(thin_ix, return_counts=True)
+
+    @staticmethod
+    def thin_indices_single_samples(factor, weights):
         numrows = len(weights)
         norm1 = np.sum(weights)
-        weights = weights.astype(np.int)
+        weights = weights.astype(int)
         norm = np.sum(weights)
 
         if abs(norm - norm1) > 1e-4:
@@ -861,7 +878,7 @@ class WeightedSamples:
         else:
             tot = 0
             i = 0
-            thin_ix = np.empty(norm // factor, dtype=np.int)
+            thin_ix = np.empty(norm // factor, dtype=int)
             ix = 0
             mult = weights[i]
             while i < numrows:
@@ -883,22 +900,29 @@ class WeightedSamples:
 
         return thin_ix
 
-    def random_single_samples_indices(self):
+    def random_single_samples_indices(self, random_state=None, thin: Optional[float] = None,
+                                      max_samples: Optional[int] = None):
         """
         Returns an array of sample indices that give a list of weight-one samples, by randomly
         selecting samples depending on the sample weights
 
+        :param random_state: random seed or Generator
+        :param thin: additional thinning factor (>1 to get fewer samples)
+        :param max_samples: optional parameter to thin to get a specified mean maximum number of samples
         :return: array of sample indices
         """
+        if max_samples is None:
+            thin = thin or 1
+        else:
+            if thin is not None:
+                raise WeightedSampleError('Cannot set thin and max_samples')
+            thin = max(1, self.norm / np.max(self.weights) / max_samples)
+        random_state = np.random.default_rng(random_state)
         max_weight = np.max(self.weights)
-        thin_ix = []
-        for i in range(self.numrows):
-            P = self.weights[i] / max_weight
-            if random.random() < P:
-                thin_ix.append(i)
-        return np.array(thin_ix, dtype=np.int)
+        rand = random_state.random(self.numrows)
+        return np.nonzero(rand <= self.weights / (max_weight * thin))[0]
 
-    def thin(self, factor):
+    def thin(self, factor: int):
         """
         Thin the samples by the given factor, giving set of samples with unit weight
 
@@ -908,22 +932,16 @@ class WeightedSamples:
         self.setSamples(self.samples[thin_ix, :], loglikes=None if self.loglikes is None else self.loglikes[thin_ix],
                         min_weight_ratio=-1)
 
-    def weighted_thin(self, factor):
+    def weighted_thin(self, factor: int):
         """
-        Thin the samples by the given factor, preserving the weights.
-        This function also preserves separate chains.
+        Thin the samples by the given factor, preserving the weights (not all set to 1).
+
         :param factor: The (integer) factor to thin by
         """
-        thin_ix = self.thin_indices(factor)
-        unique, counts = np.unique(thin_ix, return_counts=True)
+        unique, counts = self.thin_indices_and_weights(factor, self.weights)
         self.setSamples(self.samples[unique, :],
-                        loglikes=None if self.loglikes is None
-                        else self.loglikes[unique],
-                        weights=counts,
-                        min_weight_ratio=-1)
-        if self.chain_offsets is not None:
-            self.chain_offsets = np.array([np.sum(unique < off)
-                                           for off in self.chain_offsets])
+                        loglikes=None if self.loglikes is None else self.loglikes[unique],
+                        weights=counts, min_weight_ratio=-1)
 
     def filter(self, where):
         """
@@ -944,6 +962,7 @@ class WeightedSamples:
         scale = np.min(logLikes)
         if self.loglikes is not None:
             self.loglikes += logLikes
+        self.weights = np.asarray(self.weights, dtype=np.float64)
         self.weights *= np.exp(-(logLikes - scale))
         self._weightsChanged()
 
@@ -955,7 +974,8 @@ class WeightedSamples:
         """
         MaxL = np.max(self.loglikes)
         newL = self.loglikes * cool
-        self.weights = self.weights * np.exp(-(newL - self.loglikes) - (MaxL * (1 - cool)))
+        self.weights = np.asarray(self.weights, dtype=np.float64)
+        self.weights *= np.exp(-(newL - self.loglikes) - (MaxL * (1 - cool)))
         self.loglikes = newL
         self._weightsChanged()
 
@@ -987,9 +1007,11 @@ class WeightedSamples:
         fixed = []
         values = []
         for i in range(self.samples.shape[1]):
-            if np.all(self.samples[:, i] == self.samples[0, i]):
-                fixed.append(i)
-                values.append(self.samples[0, i])
+            if np.isclose(self.samples[0, i], self.samples[-1, i]):
+                mean = np.average(self.samples[:, i])
+                if np.allclose(self.samples[:, i], mean, rtol=1e-12, atol=0):
+                    fixed.append(i)
+                    values.append(mean)
         self.changeSamples(np.delete(self.samples, fixed, 1))
         return fixed, values
 
@@ -1031,6 +1053,9 @@ class WeightedSamples:
                    np.hstack((self.weights.reshape(-1, 1), loglikes.reshape(-1, 1), self.samples)),
                    fmt=self.precision)
 
+    def __getitem__(self, item):
+        return self._makeParamvec(item)
+
 
 # noinspection PyAttributeOutsideInit
 class Chains(WeightedSamples):
@@ -1058,7 +1083,8 @@ class Chains(WeightedSamples):
         """
 
         self.chains = None
-        WeightedSamples.__init__(self, **kwargs)
+        self.chain_offsets = None
+        super().__init__(**kwargs)
         self.jobItem = jobItem
         self.ignore_lines = float(kwargs.get('ignore_rows', 0))
         self.root = root
@@ -1112,7 +1138,7 @@ class Chains(WeightedSamples):
         """
 
         if self.chains is None:
-            if hasattr(self, 'chain_offsets'):
+            if self.chain_offsets is not None:
                 # must update chain_offsets to be able to correctly split back into separate filtered chains if needed
                 lens = [0]
                 for off1, off2 in zip(self.chain_offsets[:-1], self.chain_offsets[1:]):
@@ -1121,6 +1147,24 @@ class Chains(WeightedSamples):
             super().filter(where)
         else:
             raise ValueError('chains are separated, makeSingle first or call filter on individual chains')
+
+    def weighted_thin(self, factor: int):
+        """
+        Thin the samples by the given factor, giving (in general) non-unit integer weights.
+        This function also preserves separate chains.
+
+        :param factor: The (integer) factor to thin by
+        """
+        if not self.chains and self.chain_offsets is None:
+            return super().weighted_thin(factor)
+        has_chains = self.chains
+        chains = self.getSeparateChains()
+        for chain in chains:
+            chain.weighted_thin(factor)
+        self.chains = chains
+        if not has_chains:
+            self.makeSingle()
+        self.needs_update = True
 
     def getParamNames(self):
         """
@@ -1137,7 +1181,8 @@ class Chains(WeightedSamples):
         :return: A dict mapping the param name to the parameter index.
         """
         if self.samples is not None and len(self.paramNames.names) != self.n:
-            raise WeightedSampleError("paramNames size does not match number of parameters in samples")
+            raise WeightedSampleError("paramNames size (%s) does not match number of "
+                                      "parameters in samples (%s)" % (len(self.paramNames.names), self.n))
         index = dict()
         for i, name in enumerate(self.paramNames.names):
             index[name.name] = i
@@ -1178,19 +1223,26 @@ class Chains(WeightedSamples):
         Adds array variables obj.name1, obj.name2 etc, where
         obj.name1 is the vector of samples with name 'name1'
 
-        if a parameter name is of the form aa.bb.cc, it makes subobjects so you can reference obj.aa.bb.cc
+        if a parameter name is of the form aa.bb.cc, it makes subobjects so you can reference obj.aa.bb.cc.
+        If aa.bb and aa are both parameter names, then aa becomes obj.aa.value.
 
         :param obj: The object instance to add the parameter vectors variables
         :return: The obj after alterations.
         """
-        for i, name in enumerate(self.paramNames.names):
-            path = name.name.split('.')
-            ob = obj
-            for p in path[:-1]:
-                if not hasattr(ob, p):
-                    setattr(ob, p, ParSamples())
-                ob = getattr(ob, p)
-            setattr(ob, path[-1], self.samples[:, i])
+        for second in [False, True]:
+            for i, name in enumerate(self.paramNames.names):
+                path = name.name.split('.')
+                ob = obj
+                for p in path[:-1]:
+                    if not hasattr(ob, p):
+                        setattr(ob, p, ParSamples())
+                    ob = getattr(ob, p)
+                if second:
+                    if isinstance(getattr(ob, path[-1], None), ParSamples):
+                        setattr(getattr(ob, path[-1]), 'value', self.samples[:, i])
+                    else:
+                        setattr(ob, path[-1], self.samples[:, i])
+
         return obj
 
     def getParams(self):
@@ -1214,11 +1266,11 @@ class Chains(WeightedSamples):
         :return: ordered dictionary of parameter values
         """
         res = dict()
+        res['weight'] = self.weights[ix]
+        res['loglike'] = self.loglikes[ix]
         for i, name in enumerate(self.paramNames.names):
             if want_derived or not name.isDerived:
                 res[name.name] = self.samples[ix, i]
-        res['weight'] = self.weights[ix]
-        res['loglike'] = self.loglikes[ix]
         return res
 
     def _makeParamvec(self, par):
@@ -1227,8 +1279,16 @@ class Chains(WeightedSamples):
         if isinstance(par, ParamInfo):
             par = par.name
         if isinstance(par, str):
-            return self.samples[:, self.index[par]]
-        return WeightedSamples._makeParamvec(self, par)
+            index = self.index.get(par)
+            if index is not None:
+                return self.samples[:, index]
+            if par == 'weight':
+                return self.weights
+            elif par == 'loglike':
+                return self.loglikes
+            else:
+                raise ParamError('Unknown parameter %s' % par)
+        return super()._makeParamvec(par)
 
     def updateChainBaseStatistics(self):
         # old name, use updateBaseStatistics
@@ -1291,13 +1351,11 @@ class Chains(WeightedSamples):
                 files_or_samples = [files_or_samples]
             self.name_tag = self.name_tag or os.path.basename(root)
             for fname in files_or_samples:
-                if print_load_details:
-                    print(fname)
+                print_load_line(fname)
                 try:
                     self.chains.append(WeightedSamples(fname, **WSkwargs))
                 except WeightedSampleError:
-                    if print_load_details:
-                        print('Ignored file %s (likely empty)' % fname)
+                    print_load_line('Ignored file %s (likely empty)' % fname)
             nchains = len(self.chains)
             if not nchains:
                 raise WeightedSampleError('loadChains - no chains found for ' + root)
@@ -1384,6 +1442,8 @@ class Chains(WeightedSamples):
 
         :return: self
         """
+        if not self.chains:
+            raise ValueError('There are no separated chains for makeSingle()')
         self.chain_offsets = np.cumsum(np.array([0] + [chain.samples.shape[0] for chain in self.chains]))
         weights = None if self.chains[0].weights is None else np.hstack([chain.weights for chain in self.chains])
         loglikes = None if self.chains[0].loglikes is None else np.hstack([chain.loglikes for chain in self.chains])
@@ -1392,7 +1452,7 @@ class Chains(WeightedSamples):
         self.needs_update = True
         return self
 
-    def getSeparateChains(self):
+    def getSeparateChains(self) -> List['WeightedSamples']:
         """
         Gets a list of samples for separate chains.
         If the chains have already been combined, uses the stored sample offsets to reconstruct the array
@@ -1403,9 +1463,12 @@ class Chains(WeightedSamples):
         if self.chains is not None:
             return self.chains
         chainlist = []
-        for off1, off2 in zip(self.chain_offsets[:-1], self.chain_offsets[1:]):
-            chainlist.append(WeightedSamples(samples=self.samples[off1:off2], weights=self.weights[off1:off2],
-                                             loglikes=self.loglikes[off1:off2]))
+        if self.chain_offsets is None:
+            raise WeightedSampleError('Samples were not combined from separate chains')
+        else:
+            for off1, off2 in zip(self.chain_offsets[:-1], self.chain_offsets[1:]):
+                chainlist.append(WeightedSamples(samples=self.samples[off1:off2], weights=self.weights[off1:off2],
+                                                 loglikes=self.loglikes[off1:off2]))
         return chainlist
 
     def removeBurnFraction(self, ignore_frac):
@@ -1428,17 +1491,11 @@ class Chains(WeightedSamples):
         Delete parameters that are fixed (the same value in all samples)
         """
         if self.samples is not None:
-            fixed, values = WeightedSamples.deleteFixedParams(self)
+            fixed, values = super().deleteFixedParams()
             self.chains = None
         else:
-            fixed = []
-            values = []
-            chain = self.chains[0]
-            for i in range(chain.n):
-                if np.all(chain.samples[:, i] == chain.samples[0, i]):
-                    fixed.append(i)
-                    values.append(chain.samples[0, i])
-            for chain in self.chains:
+            fixed, values = self.chains[0].deleteFixedParams()
+            for chain in self.chains[1:]:
                 chain.changeSamples(np.delete(chain.samples, fixed, 1))
         if hasattr(self, 'ranges'):
             for ix, value in zip(fixed, values):

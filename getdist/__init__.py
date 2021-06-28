@@ -1,5 +1,5 @@
 __author__ = 'Antony Lewis'
-__version__ = "1.1.2"
+__version__ = "1.3.0"
 __url__ = "https://getdist.readthedocs.io"
 
 from getdist.inifile import IniFile
@@ -12,8 +12,8 @@ import sys
 if sys.version_info < (3, 7):
     import platform
 
-    if platform.python_implementation() != 'CPython':
-        raise ValueError('Only CPython is supported on Python 3.6')
+    if platform.python_implementation() not in ['CPython', 'PyPy']:
+        raise ValueError('Only CPython and PyPy is supported on Python 3.6')
 
 
 def get_defaults_file(name='analysis_defaults.ini'):
@@ -57,7 +57,7 @@ def make_cache_dir():
 
 
 config_ini = get_config()
-default_grid_root = config_ini.string('default_grid_root', '')
+default_grid_root = config_ini.string('default_grid_root', '') or None
 output_base_dir = config_ini.string('output_base_dir', '')
 cache_dir = config_ini.string('cache_dir', _get_cache_dir())
 default_getdist_settings = config_ini.string('default_getdist_settings', get_defaults_file())
