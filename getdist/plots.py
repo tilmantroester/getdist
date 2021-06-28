@@ -2572,11 +2572,11 @@ class GetDistPlotter(_BaseObject):
             args['bbox_transform'] = self.subplots[0, 0].transAxes
             args['borderaxespad'] = 0
 
-        print(no_extra_legend_space)
         self.finish_plot(labels, label_order=label_order,
                          legend_ncol=legend_ncol or self.settings.figure_legend_ncol or (
                              None if upper_roots is None else len(labels)), legend_loc=legend_loc,
-                         no_extra_legend_space=(upper_roots is None) and no_extra_legend_space, no_tight=title_limit or self.settings.title_limit,
+                         no_extra_legend_space=(upper_roots is None) and no_extra_legend_space,
+                         no_tight=title_limit or self.settings.title_limit,
                          **args)
 
     def rectangle_plot(self, xparams, yparams, yroots=None, roots=None, plot_roots=None, plot_texts=None,
